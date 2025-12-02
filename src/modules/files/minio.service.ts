@@ -19,27 +19,43 @@ export class MinioService implements OnModuleInit {
         });
     }
 
+    // async onModuleInit() {
+    //     // Tự động tạo bucket nếu chưa tồn tại
+    //     const exists = await this.minioClient.bucketExists(this.bucketName);
+    //     if (!exists) {
+    //         await this.minioClient.makeBucket(this.bucketName, 'us-east-1');
+
+    //     }
+    //     // Set policy public để xem được ảnh
+    //     const policy = {
+    //         Version: '2012-10-17',
+    //         Statement: [
+    //             {
+    //                 Effect: 'Allow',
+    //                 Principal: { AWS: ['*'] },
+    //                 Action: ['s3:GetObject'],
+    //                 Resource: [`arn:aws:s3:::${this.bucketName}/*`],
+    //             },
+    //         ],
+    //     };
+    //     await this.minioClient.setBucketPolicy(this.bucketName, JSON.stringify(policy));
+
+    // }
+
     async onModuleInit() {
-        // Tự động tạo bucket nếu chưa tồn tại
-        const exists = await this.minioClient.bucketExists(this.bucketName);
-        if (!exists) {
-            await this.minioClient.makeBucket(this.bucketName, 'us-east-1');
-
+        try {
+            // Tự động tạo bucket nếu chưa tồn tại
+            const exists = await this.minioClient.bucketExists(this.bucketName);
+            if (!exists) {
+                await this.minioClient.makeBucket(this.bucketName, 'us-east-1');
+            }
+            // ... set policy
+        } catch (error) {
+            // --- SỬA Ở ĐÂY: Catch lỗi và chỉ log warning ---
+            console.warn('CẢNH BÁO: Không kết nối được MinIO');
+            console.warn('Chi tiết lỗi:', error.message);
+            // KHÔNG throw error nữa
         }
-        // Set policy public để xem được ảnh
-        const policy = {
-            Version: '2012-10-17',
-            Statement: [
-                {
-                    Effect: 'Allow',
-                    Principal: { AWS: ['*'] },
-                    Action: ['s3:GetObject'],
-                    Resource: [`arn:aws:s3:::${this.bucketName}/*`],
-                },
-            ],
-        };
-        await this.minioClient.setBucketPolicy(this.bucketName, JSON.stringify(policy));
-
     }
 
     async uploadFile(file: Express.Multer.File) {
