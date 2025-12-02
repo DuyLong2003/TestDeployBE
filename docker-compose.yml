@@ -1,0 +1,128 @@
+services:
+  # --- DATABASE SERVICES ---
+  mongodb:
+    image: mongo:5.0.15
+    container_name: agritech_mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: 123456
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - agritech-network
+
+  redis:
+    image: redis:alpine
+    container_name: agritech_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - agritech-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio-server
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - agritech-network
+
+  # --- APP SERVICES (NESTJS) ---
+  
+  # 1. API SERVER (Nhận request)
+  backend_api:
+    build: . # Build từ Dockerfile ở thư mục hiện tại
+    container_name: agritech_api
+    restart: always
+    ports:
+      - "8080:8080" # Map cổng ra ngoài để Postman gọi
+    environment:
+      # LƯU Ý: Trong Docker phải gọi tên service, không dùng localhost
+      MONGODB_URI: mongodb://root:123456@agritech_mongo:27017/agritech?authSource=admin
+      # Config Redis cho Cache & Queue
+      REDIS_HOST: agritech_redis 
+      REDIS_PORT: 6379
+      # JWT
+      JWT_SECRET: 7ab9bca8-e1e7-4c40-8851-09e03ea41407 
+      JWT_ACCESS_TOKEN_EXPIRED: "1d"
+      # Config MinIO
+      MINIO_ENDPOINT: minio-server
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: admin123
+      MINIO_BUCKET: agritech-files
+      MINIO_USE_SSL: false
+      # Config Mail (Giữ nguyên từ .env của bạn hoặc paste vào đây)
+      MAIL_USER: ngolong2k3@gmail.com
+      MAIL_PASSWORD: qxcdxjuuebfunxqb
+      PORT: 8080
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - agritech-network
+
+  # 2. WORKER (Chỉ xử lý Job - Chạy 2 bản)
+  backend_worker:
+    build: . 
+    # Không đặt container_name cố định để có thể scale
+    restart: always
+    deploy:
+      replicas: 2 # <--- CHÌA KHÓA: Bật 2 Worker chạy song song
+    # KHÔNG MAP PORTS (Để tránh xung đột port 8080)
+    environment:
+      # Config y hệt API nhưng không cần PORT
+      MONGODB_URI: mongodb://root:123456@agritech_mongo:27017/agritech?authSource=admin
+      REDIS_HOST: agritech_redis
+      REDIS_PORT: 6379
+      # JWT
+      JWT_SECRET: 7ab9bca8-e1e7-4c40-8851-09e03ea41407 
+      JWT_ACCESS_TOKEN_EXPIRED: "1d"
+      # Config MinIO
+      MINIO_ENDPOINT: minio-server
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: admin123
+      MINIO_BUCKET: agritech-files
+      MINIO_USE_SSL: false
+      MAIL_USER: ngolong2k3@gmail.com
+      MAIL_PASSWORD: qxcdxjuuebfunxqb
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - agritech-network
+
+  # Tool quản lý Redis (Optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: agritech_redis_ui
+    environment:
+      - REDIS_HOSTS=local:agritech_redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - agritech-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+  minio_data:
+
+networks:
+  agritech-network:
+    driver: bridge
