@@ -126,7 +126,10 @@ import { ThrottlerModule } from '@nestjs/throttler';
           },
         },
 
-        autoLogging: true,
+        // autoLogging: true,
+        autoLogging: {
+          ignore: (req) => req.url.includes('/health'), // Nếu url chứa /health thì ĐỪNG log ra
+        },
         // 4. Map các trường req/res vào log object
         serializers: {
           req: (req) => ({
